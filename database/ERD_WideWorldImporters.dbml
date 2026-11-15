@@ -1,0 +1,45 @@
+// ERD parcial de WideWorldImporters (OLTP): análisis de ventas.
+// Alcance: cuatro tablas y cinco relaciones confirmadas por sys.foreign_key_columns.
+// Nota: no es un modelo completo de toda la base de datos.
+
+Table Sales.Customers {
+  CustomerID int [pk]
+  BillToCustomerID int [note: 'Cliente responsable de facturación; autorreferencia']
+  CustomerName nvarchar
+  ValidFrom datetime2
+  ValidTo datetime2
+}
+
+Table Sales.Invoices {
+  InvoiceID int [pk]
+  CustomerID int [note: 'Cliente asociado a la venta']
+  BillToCustomerID int [note: 'Cliente responsable de facturación']
+  InvoiceDate date
+  IsCreditNote bit
+  LastEditedWhen datetime2
+}
+
+Table Sales.InvoiceLines {
+  InvoiceLineID int [pk]
+  InvoiceID int
+  StockItemID int
+  Quantity int
+  UnitPrice decimal
+  TaxAmount decimal
+  ExtendedPrice decimal
+  LineProfit decimal
+}
+
+Table Warehouse.StockItems {
+  StockItemID int [pk]
+  StockItemName nvarchar
+  Brand nvarchar
+  UnitPrice decimal
+  ValidFrom datetime2
+}
+
+Ref: Sales.Customers.BillToCustomerID > Sales.Customers.CustomerID
+Ref: Sales.Invoices.CustomerID > Sales.Customers.CustomerID
+Ref: Sales.Invoices.BillToCustomerID > Sales.Customers.CustomerID
+Ref: Sales.InvoiceLines.InvoiceID > Sales.Invoices.InvoiceID
+Ref: Sales.InvoiceLines.StockItemID > Warehouse.StockItems.StockItemID

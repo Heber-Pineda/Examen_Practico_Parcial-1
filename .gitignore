@@ -1,0 +1,91 @@
+# SQL Server: respaldos y archivos físicos
+*.[bB][aA][kK]
+*.bacpac
+*.dacpac
+*.trn
+*.mdf
+*.ndf
+*.ldf
+backups/
+backup/
+
+# Secretos y configuración local; conservar futuras plantillas sin credenciales
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+!.env.*.template
+secrets/
+credentials*.json
+service-account*.json
+client_secret*.json
+secrets.json
+*.pem
+*.key
+*.pfx
+*.p12
+.aws/
+.azure/
+.ssh/
+
+# Python: entornos, cachés y resultados de herramientas
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# JavaScript / TypeScript: dependencias y compilación
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+*.tsbuildinfo
+dist/
+build/
+coverage/
+.cache/
+
+# Datos operativos, modelos y resultados generados
+artifacts/
+data/local/
+data/raw/
+data/processed/
+machine-learning/models/
+*.joblib
+*.pkl
+*.pickle
+logs/
+*.log
+
+# Temporales, archivos de bloqueo de Office y sistema operativo
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+~$*
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vs/
+.vscode/
+
+# Mantener versionables código SQL, CSV de metadatos, diagramas,
+# documentación, pruebas, manifiestos y lockfiles de dependencias.
