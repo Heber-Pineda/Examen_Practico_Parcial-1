@@ -49,6 +49,34 @@ def provider_fixture(*answers):
 
 
 class AssistantTests(unittest.TestCase):
+    def test_physical_inventory_is_refused_even_if_the_model_would_return_sales(self):
+        analytics = Mock()
+        provider = provider_fixture(plan())
+        result = AssistantService(analytics, provider).ask(
+            "¿Cuál es el inventario físico disponible actualmente de cada producto?", SalesFilters())
+        self.assertEqual(result["status"], "INSUFFICIENT_DATA")
+        self.assertEqual(result["evidence"], [])
+        self.assertEqual(result["paragraphs"], [])
+        provider.generate.assert_not_called()
+        analytics.consistent.assert_not_called()
+        analytics.catalogs.assert_not_called()
+
+    def test_acceptance_http_diagnostic_preserves_status_and_known_api_code_only(self):
+        from generative_ai.__main__ import http_error_details
+        body = json.dumps({"error": {"code": "AI_PROVIDER_TIMEOUT", "message": "isolated-secret"}}).encode()
+        error = HTTPError("http://isolated-secret.invalid", 503, "isolated-secret", {}, io.BytesIO(body))
+        details = http_error_details(error)
+        self.assertEqual(details, {"error_type": "HTTPError", "http_status": 503, "error_code": "AI_PROVIDER_TIMEOUT"})
+        self.assertNotIn("isolated-secret", json.dumps(details))
+
+    def test_acceptance_http_diagnostic_keeps_status_when_the_body_is_unsafe_or_invalid(self):
+        from generative_ai.__main__ import http_error_details
+        for body in (b"isolated-secret", b'{"error":{"code":"isolated-secret"}}',
+                     b'{"error":{"code":[]}}', b'{}', b'"' + b"x" * 9000, None):
+            with self.subTest(body=body[:40] if body else None):
+                error = HTTPError("http://example.invalid", 503, "private", {}, io.BytesIO(body) if body is not None else None)
+                self.assertEqual(http_error_details(error), {"error_type": "HTTPError", "http_status": 503})
+
     def test_invalid_optional_provider_configuration_does_not_break_application(self):
         with patch.dict("os.environ", {"GENAI_TIMEOUT": "invalid"}):
             service = AssistantService(Mock())

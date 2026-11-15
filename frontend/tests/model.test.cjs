@@ -112,6 +112,25 @@ test('asistente envía una pregunta y filtros por POST sin exponer la clave en e
   } finally { global.fetch = original; }
 });
 
+test('asistente respeta el presupuesto de Ollama y limita tiempos inválidos del servidor', async () => {
+  const originalFetch = global.fetch;
+  const originalTimer = global.setTimeout;
+  const times = [];
+  global.fetch = async () => new Response(JSON.stringify({ status: 'NOT_CONFIGURED' }), { status: 200 });
+  global.setTimeout = (callback, duration, ...args) => {
+    times.push(duration);
+    return originalTimer(callback, duration, ...args);
+  };
+  try {
+    for (const seconds of [165, 1000000, NaN]) {
+      await api.ask('isolated-test-token', 'Ventas', draft, 'publication-test', new AbortController().signal, true, seconds);
+    }
+    assert.ok(times.includes(165000));
+    assert.ok(times.includes(300000));
+    assert.ok(times.includes(90000));
+  } finally { global.fetch = originalFetch; global.setTimeout = originalTimer; }
+});
+
 test('lectura de notificación utiliza POST y la ruta de identificación explícita', async () => {
   const original = global.fetch;
   global.fetch = async (url, options) => {

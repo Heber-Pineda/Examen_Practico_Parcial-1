@@ -11,6 +11,21 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 
+def http_error_details(error):
+    """Conserva estado/código conocidos, sin cuerpo, URL, cabeceras ni mensaje crudo."""
+    details = {"error_type": "HTTPError", "http_status": error.code}
+    try:
+        code = json.loads(error.read(8192))["error"]["code"]
+        if code in {"AI_NOT_CONFIGURED", "AI_RATE_LIMIT", "AI_BUSY", "AI_PROVIDER_AUTH", "AI_PROVIDER_LIMIT",
+                    "AI_PROVIDER_UNAVAILABLE", "AI_PROVIDER_REDIRECT", "AI_PROVIDER_TIMEOUT", "AI_MODEL_NOT_AVAILABLE",
+                    "AI_PROVIDER_INVALID_RESPONSE", "AI_UNVERIFIED_ANSWER", "DW_UNAVAILABLE", "DW_BUSY",
+                    "PUBLICATION_CHANGED", "UNAUTHORIZED", "INVALID_REQUEST", "INVALID_FILTERS", "INVALID_QUESTION"}:
+            details["error_code"] = code
+    except (ValueError, KeyError, TypeError, OSError, AttributeError, RecursionError):
+        pass
+    return details
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("cases", "acceptance"))
@@ -27,27 +42,31 @@ def main(argv=None):
         print("Requiere --allow-http-access, API_ACCESS_TOKEN y API local http.", file=sys.stderr)
         return 2
     base = args.api_url.rstrip("/")
-    def call(path, body=None):
+    def call(path, body=None, timeout=100):
         request = Request(base + path, data=json.dumps(body).encode() if body is not None else None,
                           headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
-        with urlopen(request, timeout=100) as response:
+        with urlopen(request, timeout=timeout) as response:
             return json.load(response)
     try:
-        if call("/api/v1/assistant/status")["status"] != "READY":
+        status = call("/api/v1/assistant/status")
+        if status["status"] != "READY":
             print("PENDIENTE: configurar el proveedor real; no se ejecutaron las diez preguntas.")
             return 2
+        budget = status.get("request_timeout_seconds", 100)
+        timeout = min(300, max(100, budget)) if type(budget) in (int, float) else 100
         results = []
         for case in cases:
             try:
                 try:
-                    answer = call("/api/v1/assistant/ask", {"question": case["question"]})
+                    answer = call("/api/v1/assistant/ask", {"question": case["question"]}, timeout)
                 except HTTPError as exc:
                     if exc.code != 429:
                         raise
                     time.sleep(60)
-                    answer = call("/api/v1/assistant/ask", {"question": case["question"]})
+                    answer = call("/api/v1/assistant/ask", {"question": case["question"]}, timeout)
             except Exception as exc:
-                results.append({**case, "result": "FAIL", "obtained": {"error_type": type(exc).__name__}, "unverified_assertions": []})
+                details = http_error_details(exc) if isinstance(exc, HTTPError) else {"error_type": type(exc).__name__}
+                results.append({**case, "result": "FAIL", "obtained": details, "unverified_assertions": []})
                 continue
             facts = {item["statement"] for item in answer.get("evidence", [])}
             unverified = [text for text in answer.get("paragraphs", []) if text not in facts]

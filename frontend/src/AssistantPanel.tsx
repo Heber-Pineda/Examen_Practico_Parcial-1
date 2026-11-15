@@ -36,7 +36,7 @@ export default function AssistantPanel({ token, publication, draft, unauthorized
     request.current?.abort(); const controller = new AbortController(); request.current = controller;
     setBusy(true); setError(null); setAnswer(null); setAsked(question.trim());
     try {
-      const value = await api.ask(token, question.trim(), draft, publication.id, controller.signal, context);
+      const value = await api.ask(token, question.trim(), draft, publication.id, controller.signal, context, status.request_timeout_seconds);
       if (!controller.signal.aborted) setAnswer(value);
     } catch (failure) { if (!controller.signal.aborted) handleError(failure); }
     finally { if (!controller.signal.aborted) setBusy(false); }
@@ -51,6 +51,7 @@ export default function AssistantPanel({ token, publication, draft, unauthorized
     {error && <div className="message error module-message" role="alert"><span>{error.message}</span>{error.status === 409 && <button className="text-button" onClick={refreshDashboard}>Actualizar panel</button>}</div>}
     {busy && <p className="module-state" role="status">El proveedor interpreta la pregunta y organiza datos del corte publicado…</p>}
     {answer && <article className="assistant-answer"><div className="assistant-question">{asked}</div>
+      {answer.period_notice && <p className="assistant-coverage-warning">{answer.period_notice}</p>}
       {answer.status !== 'ANSWERED' ? <div className="assistant-insufficient"><strong>{answer.status === 'NEEDS_CLARIFICATION' ? 'Necesito precisar la consulta' : 'Información insuficiente'}</strong><p>{answer.message}</p></div> : <>
         {answer.partial_coverage && <p className="assistant-coverage-warning">La cobertura es parcial: la respuesta usa únicamente las fechas disponibles, indicadas en cada evidencia.</p>}
         {answer.paragraphs?.map((text, index) => <p className="assistant-paragraph" key={index}>{text} <a href={'#evidence-' + answer.citations?.[index]}>[{answer.citations?.[index]}]</a></p>)}

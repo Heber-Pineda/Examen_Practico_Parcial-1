@@ -34,9 +34,10 @@ async function get<T>(path: string, token: string, signal: AbortSignal, payload?
 
 export const api = {
   assistantStatus: (token: string, signal: AbortSignal) => get<AssistantStatus>('assistant/status', token, signal),
-  ask: (token: string, question: string, draft: Draft, publication: string, signal: AbortSignal, useContext = true) => {
+  ask: (token: string, question: string, draft: Draft, publication: string, signal: AbortSignal, useContext = true, timeoutSeconds = 90) => {
     const context = useContext ? Object.fromEntries(toQuery(draft, publication)) : { publication_id: publication };
-    return get<AssistantAnswer>('assistant/ask', token, signal, { ...context, question }, 90000);
+    const timeout = Number.isFinite(timeoutSeconds) ? Math.max(90, Math.min(300, timeoutSeconds)) * 1000 : 90000;
+    return get<AssistantAnswer>('assistant/ask', token, signal, { ...context, question }, timeout);
   },
   notifications: (token: string, signal: AbortSignal) => get<NotificationsResult>('notifications', token, signal),
   readNotification: (token: string, id: string, signal: AbortSignal) =>

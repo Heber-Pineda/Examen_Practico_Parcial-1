@@ -4,7 +4,7 @@ Proyecto académico de ventas sobre WideWorldImporters. Stack aprobado: SQL Serv
 
 El usuario confirmó el funcionamiento real de ETL/DW, API, dashboard y ML: publicación **PUBLISHED**, 228,265 líneas, 70,510 facturas, 663 clientes y 227 productos, con reconciliación sin diferencias. El entrenamiento real utilizó 41 meses y seleccionó `seasonal_naive` según el MAE de validación, con seis meses de prueba y pronósticos de junio a agosto de 2016.
 
-Las alertas cuentan con validación manual confirmada: script SQL 005 ejecutado, regla académica `DEMO_SALES_MOM` activada, notificación entregada y marcada como leída, y consulta de duplicados con cero filas. Los reintentos reales y la programación automática siguen pendientes de validación. El módulo de IA generativa está implementado, pero su integración y validación con Ollama están pendientes.
+Las alertas cuentan con validación manual confirmada: script SQL 005 ejecutado, regla académica `DEMO_SALES_MOM` activada, notificación entregada y marcada como leída, y consulta de duplicados con cero filas. Los reintentos reales y la programación automática siguen pendientes de validación. El asistente dispone de adaptadores OpenAI y Ollama; la comprobación real de integración con Ollama y las diez preguntas de aceptación siguen pendientes.
 
 ## API y dashboard de ventas
 
@@ -102,15 +102,43 @@ La prueba Ridge/joblib usa datos sintéticos y se omite si falta scikit-learn. L
 
 ## Asistente de IA generativa
 
-**IMPLEMENTADO / PENDIENTE:** el módulo del asistente, sus consultas autorizadas y su interfaz están implementados. La integración y validación real con **Ollama** están pendientes. El código actual incluye únicamente un adaptador OpenAI; establecer `GENAI_PROVIDER=ollama` o indicar una URL local no incorpora soporte de Ollama. Aún no hay comandos de ejecución de Ollama validados para este proyecto ni aceptación real de las diez preguntas con ese proveedor.
+**CONFIRMADO:** la aceptación real con Ollama 0.40.16 y `qwen2.5:3b-instruct`, registrada en `artifacts/genai-acceptance/20261115T215218955555Z.json`, obtuvo **6/10 aprobadas y 4/10 no aprobadas**. IA-02 respondió correctamente el importe extendido de mayo de 2016: **5,704,232.71 u.m.**, exclusivamente del 1 al 31 de mayo. Esa evidencia confirma ese caso mensual; no acredita una aceptación de 10/10.
 
-La plantilla `.env.example` deja proveedor, modelo y claves vacíos. Ventas, ML y alertas pueden ejecutarse mientras el asistente permanece pendiente. No se debe mostrar ni documentar una respuesta simulada como respuesta real de un modelo.
+**IMPLEMENTADO EN CÓDIGO:** selección de proveedor `ollama` u `openai`, preservando las dos fases y las consultas autorizadas. **PENDIENTE:** resolver y validar los cuatro casos no aprobados. Las pruebas aisladas usan transportes y datos simulados; no se presentan como respuestas reales. No hay dependencias nuevas: ambos adaptadores utilizan la biblioteca estándar de Python.
 
-Referencia técnica opcional del adaptador **OpenAI existente**, no de la integración pendiente con Ollama: [Responses API](https://developers.openai.com/api/docs/quickstart), con [salidas estructuradas](https://developers.openai.com/api/docs/guides/structured-outputs). Este adaptador usa HTTPS de la biblioteca estándar: **no necesita dependencias adicionales**. Si se elige probarlo expresamente, configurar en la terminal habitual de FastAPI, sin escribir claves en archivos versionados:
+El adaptador Ollama utiliza [`POST /api/chat`](https://docs.ollama.com/api/chat), `stream: false` y el esquema JSON del contrato en [`format`](https://docs.ollama.com/capabilities/structured-outputs). La respuesta se valida también en Python: tipos, campos obligatorios, enumeraciones, cantidades y ausencia de propiedades adicionales. Se rechazan JSON duplicados o inválidos, generación truncada, otro modelo y llamadas a herramientas; la segunda fase solo admite IDs de evidencias existentes.
+
+Comprobación manual del servicio local, sin SQL:
+
+```powershell
+Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/version'
+ollama list
+```
+
+Si el servicio está detenido, iniciarlo con `ollama serve` en su propia terminal; no iniciar una segunda instancia cuando ya escucha en 11434. Para la integración, detener FastAPI con Ctrl+C en su terminal habitual, conservar sus variables `API_*` y ejecutar desde la raíz:
+
+```powershell
+$env:GENAI_PROVIDER = 'ollama'
+$env:GENAI_MODEL = 'qwen2.5:3b-instruct'
+$env:OLLAMA_BASE_URL = 'http://127.0.0.1:11434'
+$env:GENAI_TIMEOUT = '60'
+$env:GENAI_MAX_OUTPUT_TOKENS = '900'
+
+.\.venv\Scripts\python.exe -B -m uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Ollama local no necesita `OPENAI_API_KEY`; nunca se envía esa clave al adaptador local. `OLLAMA_BASE_URL` solo acepta HTTP en loopback, con puerto configurable y sin credenciales, rutas, consultas ni fragmentos. Admite `127.0.0.1`, `localhost` normalizado a `127.0.0.1` e IPv6 `::1`; se desactivan proxies y redirecciones únicamente para Ollama. Un error local no cambia automáticamente a OpenAI ni bloquea ventas, pronósticos o alertas.
+
+`GENAI_TIMEOUT` es el límite por fase: 1–120 segundos para Ollama y 1–30 para OpenAI. Sin definirlo se usan 60 y 15 segundos, respectivamente. `GENAI_MAX_OUTPUT_TOKENS` conserva el rango 200–1600. El frontend y el ejecutor de aceptación adaptan su espera a `request_timeout_seconds` del estado del asistente, con un máximo de 300 segundos; los demás módulos conservan sus tiempos. Las respuestas inválidas, la desconexión, el modelo ausente y el timeout se muestran como errores seguros, sin publicar cifras inventadas.
+
+En la terminal del frontend, ejecutar `npm run dev` desde `frontend` si aún no está iniciado. Iniciar sesión, pulsar «Revisar proveedor» y comprobar `ollama · qwen2.5:3b-instruct`; el estado READY solo confirma configuración, no conectividad ni aceptación. Formular una pregunta con datos, revisar cifras/período/evidencias y comprobar una pregunta fuera de cobertura. Los comandos reales los ejecuta el usuario; no se realizaron llamadas a Ollama ni a SQL Server durante el desarrollo de este adaptador.
+
+La plantilla `.env.example` incluye valores locales de ejemplo y claves vacías; no se carga automáticamente. El adaptador **OpenAI existente** se conserva: [Responses API](https://developers.openai.com/api/docs/quickstart), con [salidas estructuradas](https://developers.openai.com/api/docs/guides/structured-outputs). Para elegirlo expresamente, configurar en la terminal habitual de FastAPI, sin escribir claves en archivos versionados:
 
 ```powershell
 $env:GENAI_PROVIDER = 'openai'
 $env:GENAI_MODEL = 'gpt-4.1-mini'
+$env:GENAI_TIMEOUT = '15'
 $providerSecret = Read-Host 'Clave de OpenAI' -AsSecureString
 $env:OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', $providerSecret).Password
 Remove-Variable providerSecret
@@ -118,9 +146,11 @@ Remove-Variable providerSecret
 .\.venv\Scripts\python.exe -B -m uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Conservar las variables `API_*` de conexión y la clave de acceso del panel. El modelo es configurable; la cuenta debe tener acceso y cuota de API. React muestra configuración pendiente si falta proveedor/modelo/clave, y errores seguros si falla la conexión, autenticación o cuota. No simula respuestas. La clave permanece en el backend; el navegador utiliza únicamente su clave de acceso existente.
+Conservar las variables `API_*` de conexión y la clave de acceso del panel. OpenAI requiere una cuenta con acceso y cuota de API; Ollama requiere su servicio local y el modelo descargado. React muestra configuración pendiente si falta modelo o configuración válida y, para OpenAI, su clave. La clave del proveedor permanece en el backend; el navegador utiliza únicamente su clave de acceso existente.
 
 El modelo interpreta la pregunta como una intención de un catálogo cerrado: seis KPIs, cobertura, agregados mensuales/anuales y rankings de clientes/productos. El servidor valida fechas, roles e identidades, ejecuta las consultas parametrizadas existentes y entrega evidencias agregadas. Una segunda generación selecciona/ordena IDs de evidencias; el servidor compone cada frase visible con su texto y cifras verificados, sin aceptar prosa factual libre ni SQL del modelo. Se muestran período, filtros efectivos, fuente, consulta autorizada y corte. Los períodos sin cobertura se reconocen como información insuficiente; los filtros aplicados pueden desactivarse en el asistente.
+
+Política de períodos: el backend interpreta determinísticamente mes/año, año completo y rangos absolutos (por ejemplo, «mayo de 2016», «2015» o «del 2016-04-01 al 2016-05-31»). El período de la pregunta prevalece sobre las fechas del dashboard; se avisa en la respuesta y se conservan los filtros de cliente, producto y documento. Sin período explícito se usan las fechas del dashboard o la cobertura disponible; las fechas del modelo no deciden el filtro. «Todo el histórico» debe solicitarse expresamente para reemplazar fechas aplicadas por toda la cobertura. Al comparar abril y mayo se consulta cada período por separado y se exige evidencia de ambos. Años ausentes, fechas inválidas o expresiones ambiguas/relativas requieren precisión. Si falta cobertura de algún mes solicitado (por ejemplo, el año 2016 completo), se devuelve información insuficiente; no se cambia silenciosamente a otro agregado ni a un período parcial. Las fechas finales escritas por el usuario son inclusivas y se convierten al límite exclusivo de las consultas.
 
 Rutas protegidas: `GET /api/v1/assistant/status` y `POST /api/v1/assistant/ask`. Preguntas de hasta 1000 caracteres, máximo doce por minuto y dos simultáneas; tiempo y tokens del proveedor limitados. Al preguntar se envían al proveedor la pregunta, filtros y evidencias agregadas, sin credenciales ni filas de detalle. Las claves y los errores crudos del proveedor no se registran ni devuelven. No se inventan causas, inventarios actuales o cifras futuras.
 
@@ -132,7 +162,23 @@ Diez preguntas de aceptación en `generative_ai/acceptance_cases.json`, incluida
 .\.venv\Scripts\python.exe -B -m generative_ai acceptance --allow-http-access
 ```
 
-Los comandos de aceptación requieren un proveedor compatible e integrado. La aceptación con Ollama permanece pendiente hasta completar su adaptador y ejecutar las diez preguntas; configurar sus variables por sí solo no basta. Sin proveedor configurado la aceptación queda pendiente. Un resultado PASS requiere también revisión funcional de que intención y filtros responden a la pregunta; la comprobación automática garantiza trazabilidad literal, no comprensión semántica perfecta.
+Los comandos de aceptación usan el proveedor seleccionado en la API. Para Ollama se ejecutan desde otra terminal con el `API_ACCESS_TOKEN` vigente, una vez iniciado el servicio local y reiniciado FastAPI con las variables anteriores. Consultar su configuración con `Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/v1/assistant/status' -Headers @{ Authorization = "Bearer $env:API_ACCESS_TOKEN" }`. El reporte real citado registra PASS en IA-01, IA-02, IA-03, IA-05, IA-06 e IA-10. Las cuatro no aprobadas son:
+
+- **IA-04, facturas distintas de enero de 2014:** respondió importe extendido con `sales_month_v1`, en lugar de contar facturas mediante `sales_metrics_v1`. Fallo funcional de interpretación/selección del indicador; las fechas son correctas.
+- **IA-07, cinco clientes compradores de mayo de 2016:** devolvió `NEEDS_CLARIFICATION` por un plan no autorizado inequívocamente. El período solicitado es correcto; el reporte no conserva el plan ni la validación concreta que falló, por lo que no permite atribuirlo a un filtro específico.
+- **IA-08, distribución mensual de 2015:** solo quedó `HTTPError`, sin estado HTTP ni código API. Es un fallo de ejecución HTTP cuya causa específica está pendiente; no demuestra por sí solo timeout ni indisponibilidad de Ollama.
+- **IA-09, inventario físico disponible:** respondió importe base histórico de ventas. Fallo funcional de clasificación del alcance. Se agregó un rechazo determinista de preguntas explícitas de inventario físico, sin consultar el DW ni generar una respuesta de ventas; su validación real sigue pendiente.
+
+No se reejecutó la aceptación durante esta revisión ni se modificó el reporte original. Los futuros errores HTTP conservan el estado y los códigos API conocidos, sin mensajes crudos, credenciales ni cuerpos de respuesta. Las dos preguntas sin información deben responder INSUFFICIENT_DATA; IA-10 ya lo hizo en esta ejecución. Un PASS requiere también revisión funcional de intención y filtros; `unverified_assertions: []` solo acredita coincidencia literal con las evidencias y no demuestra que respondan al indicador solicitado.
+
+Pruebas aisladas del adaptador y regresión del asistente, sin llamar a Ollama/OpenAI ni a SQL Server:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_assistant_periods.py -v
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_ollama.py -v
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_intelligent_modules.py -k AssistantTests -v
+.\frontend\node_modules\.bin\tsc.cmd --noEmit -p .\frontend\tsconfig.json
+```
 
 ## Alertas y notificaciones
 
@@ -194,7 +240,7 @@ $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -Repetiti
 Register-ScheduledTask -TaskName 'WWI-Alertas-Academicas' -Action $action -Trigger $trigger
 ```
 
-Estos comandos de programación no fueron ejecutados por el agente y no constituyen evidencia de automatización validada. Las rutas protegidas del buzón son `GET /api/v1/notifications` y `POST /api/v1/notifications/{UUID}/read`. En destinos nuevos, sin script/permisos se muestra preparación pendiente; los errores del buzón no bloquean ventas ni pronósticos. Permanecen pendientes la comprobación real de no activación, los reintentos ante fallos reales, la programación automática y la revisión de permisos mínimos. En IA falta integrar Ollama y validar las diez preguntas. No se mantienen como pendientes el DDL 005, la activación, entrega, lectura o la consulta de duplicados ya confirmados. Pruebas críticas locales desde la raíz: `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_intelligent_modules.py -v`, `npm --prefix .\frontend test` y `npm --prefix .\frontend run build`.
+Estos comandos de programación no fueron ejecutados por el agente y no constituyen evidencia de automatización validada. Las rutas protegidas del buzón son `GET /api/v1/notifications` y `POST /api/v1/notifications/{UUID}/read`. En destinos nuevos, sin script/permisos se muestra preparación pendiente; los errores del buzón no bloquean ventas ni pronósticos. Permanecen pendientes la comprobación real de no activación, los reintentos ante fallos reales, la programación automática y la revisión de permisos mínimos. La aceptación real de IA obtuvo 6/10; siguen pendientes de resolución y validación los cuatro casos descritos en la sección del asistente. No se mantienen como pendientes el DDL 005, la activación, entrega, lectura o la consulta de duplicados ya confirmados. Pruebas críticas locales desde la raíz: `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_intelligent_modules.py -v`, `npm --prefix .\frontend test` y `npm --prefix .\frontend run build`.
 
 ## Ejecución
 

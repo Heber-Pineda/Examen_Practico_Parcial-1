@@ -41,11 +41,14 @@ export type ForecastModel = {
 export type ForecastResult = { status: 'NOT_TRAINED'; message: string } |
   { status: 'READY' | 'STALE'; publication: Publication; model: ForecastModel };
 
-export type AssistantStatus = { status: 'READY' | 'NOT_CONFIGURED'; provider: string; model: string | null; message: string };
+export type AssistantStatus = { status: 'READY' | 'NOT_CONFIGURED'; provider: string; model: string | null; message: string; request_timeout_seconds?: number };
 export type AssistantEvidence = { id: string; statement: string; query_id: string; source: string; period_from: string; period_to: string };
 export type AssistantAnswer = { status: 'ANSWERED' | 'INSUFFICIENT_DATA' | 'NEEDS_CLARIFICATION' | 'NOT_CONFIGURED';
   message?: string; paragraphs?: string[]; evidence?: AssistantEvidence[]; citations?: string[];
   publication?: Publication; model?: string; partial_coverage?: boolean; composition?: string;
+  period_notice?: string; period_policy?: 'QUESTION_OVERRIDES_DASHBOARD' | 'DASHBOARD_OR_COVERAGE';
+  requested_periods?: { date_from: string; date_to: string; label: string }[];
+  effective_periods?: { date_from: string; date_to: string; label: string }[];
   effective_filters?: Record<string, string | number | boolean | null> };
 export type NotificationItem = { notification_id: string; title: string; body: string; delivered_at_utc: string;
   read_at_utc: string | null; source_publication: string; is_demo: boolean; delivery_status: string;
