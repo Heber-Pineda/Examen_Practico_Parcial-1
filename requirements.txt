@@ -1,0 +1,2 @@
+# Única dependencia de ejecución de este lote; las pruebas usan unittest.
+pyodbc==5.5.0
