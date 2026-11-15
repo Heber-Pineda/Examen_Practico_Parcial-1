@@ -1,86 +1,307 @@
 # Plataforma Integral de Ingeniería de Datos y Analítica Inteligente
 
-Proyecto académico de análisis de ventas sobre WideWorldImporters. Stack aprobado: SQL Server 2022 Express, ETL con Python/SQL, FastAPI, React/TypeScript/Vite, Apache ECharts, Scikit-learn, IA generativa mediante consultas controladas y notificaciones.
+Proyecto académico de ventas sobre WideWorldImporters. Stack aprobado: SQL Server 2022 Express, Python/SQL, FastAPI, React/TypeScript/Vite/ECharts, Scikit-learn, IA generativa y notificaciones.
 
-El repositorio contiene el descubrimiento y los contratos técnicos. ETL, DW, API, frontend, ML y automatización todavía no están implementados.
+El usuario confirmó el funcionamiento real de ETL/DW, API, dashboard y ML: publicación **PUBLISHED**, 228,265 líneas, 70,510 facturas, 663 clientes y 227 productos, con reconciliación sin diferencias. El entrenamiento real utilizó 41 meses y seleccionó `seasonal_naive` según el MAE de validación, con seis meses de prueba y pronósticos de junio a agosto de 2016.
 
-## Documentación del proyecto
+Las alertas cuentan con validación manual confirmada: script SQL 005 ejecutado, regla académica `DEMO_SALES_MOM` activada, notificación entregada y marcada como leída, y consulta de duplicados con cero filas. Los reintentos reales y la programación automática siguen pendientes de validación. El módulo de IA generativa está implementado, pero su integración y validación con Ollama están pendientes.
+
+## API y dashboard de ventas
+
+Requisitos: Python 3.13, ODBC Driver 17, Node.js compatible con `^20.19.0 || >=22.12.0` y npm, según `frontend/package.json`. Dependencias en `backend/requirements.txt` y `frontend/package.json`. Estos comandos son para ejecución manual; esta actualización documental no instala paquetes ni accede a SQL Server.
+
+Desde la raíz, instalar las dependencias e iniciar la API local:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
+
+$env:API_ENVIRONMENT = 'local'
+$env:API_SQL_SERVER = 'HEBER-ENOC-PINE\SQLEXPRESS'
+$env:API_SQL_DATABASE = 'WideWorldImporters_Analytics'
+$env:API_ODBC_DRIVER = 'ODBC Driver 17 for SQL Server'
+$env:API_TRUST_SERVER_CERTIFICATE = 'true'
+$env:API_ACCESS_TOKEN = (& .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(32))")
+Write-Host "Clave para ingresar al panel: $env:API_ACCESS_TOKEN"
+
+.\.venv\Scripts\python.exe -B -m uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+En otra terminal, con la carpeta de trabajo en `frontend` (desde la raíz, entrar con `Set-Location .\frontend`):
+
+```powershell
+npm install
+npm run dev
+```
+
+Desde esa misma carpeta también se ejecutan `npm test` y `npm run build`. Si la terminal permanece en la raíz del repositorio, los comandos equivalentes son `npm --prefix .\frontend install` y `npm --prefix .\frontend run dev`; no usar ese prefijo cuando ya se está dentro de `frontend`.
+
+Abrir **http://127.0.0.1:5173** e ingresar la clave mostrada en la primera terminal. Se mantiene solo en memoria; recargar la página exige ingresarla nuevamente. No escribirla en variables `VITE_*`, URLs ni almacenamiento del navegador. Vite reenvía `/api` a la API local. La excepción TLS conserva `Encrypt=yes` y solo admite explícitamente la instancia indicada y `API_ENVIRONMENT=local`. Las variables `ETL_*` no sustituyen las de la API; `.env.example` no se carga automáticamente.
+
+La API usa autenticación integrada de Windows. Para las consultas analíticas, su identidad de ejecución debe tener `SELECT` en `dw.FactVentas`, `dw.DimCliente`, `dw.DimProducto`, `audit.etl_checkpoint` y `audit.etl_publication`, sin permisos de escritura sobre el DW. El buzón añade los permisos restringidos descritos en «Alertas y notificaciones». El adaptador analítico solicita acceso ODBC de solo lectura; los cambios de estado del buzón utilizan procedimientos específicos. La separación real de permisos corresponde a SQL Server y debe verificarse con la identidad elegida. Ambos servidores escuchan únicamente en loopback: este arranque corresponde al laboratorio local.
+
+Rutas protegidas: `GET /api/v1/catalogs`, `/api/v1/overview` y `/api/v1/sales`; documentación local en http://127.0.0.1:8000/docs. `GET /health` verifica el proceso sin abrir conexiones. Filtros: `date_from` inclusiva, `date_to` exclusiva, `customer_id` comprador, `bill_to_customer_id` facturado, `stock_item_id`, `is_credit_note`. El panel presenta «Hasta» inclusiva y convierte el límite. Detalle: `page`, `page_size` (1–100), `sort=date_desc|amount_desc`. `publication_id` exige el corte cargado; un HTTP 409 solicita actualizar el panel.
+
+Los seis KPIs respetan el contrato: base, extendido, unidades, facturas distintas, utilidad y `100 × utilidad / base`. Los importes viajan como cadenas decimales exactas; el margen es NULL cuando no es calculable. Se preservan signos y créditos sin reinterpretarlos; no se asume moneda. Rankings y tendencias usan importe extendido. La comparación anual ofrece meses comunes y señala límites dentro de un mes. No se rellena con cero un mes sin cobertura del origen; las dimensiones Tipo 1 muestran sus nombres actuales.
+
+Cada respuesta comprueba el checkpoint antes y después de consultar con `READ COMMITTED`, y reintenta una vez si cambió la publicación. No filtra las ventas por `publication_id` de cada fila. Hay límites de concurrencia, tiempos y paginación. Las solicitudes HTTP no ejecutan ETL, entrenamientos ni automatizaciones.
+
+Pruebas críticas aisladas y compilación, sin SQL:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_api.py -v
+npm --prefix .\frontend test
+npm --prefix .\frontend run build
+```
+
+Las dos pruebas HTTP de `test_api.py` usan un servicio simulado y requieren adicionalmente `httpx` (`.\.venv\Scripts\python.exe -m pip install httpx`); si falta, se informan como omitidas. Las pruebas HTTP nuevas de ML usan ASGI directamente y no necesitan httpx. Las pruebas aisladas no sustituyen la comprobación con datos reales.
+
+## Machine Learning: ventas mensuales
+
+**CONFIRMADO:** entrenamiento real completado con 41 meses históricos, de enero de 2013 a mayo de 2016. El método seleccionado fue `seasonal_naive` (referencia del mismo mes del año anterior), según el MAE de validación. Se reservaron seis meses para prueba y se generaron pronósticos para junio, julio y agosto de 2016. Los valores concretos de MAE/RMSE y la versión se consultan en los artefactos o endpoints del modelo; no se añaden cifras no proporcionadas por la ejecución real.
+
+Objetivo: apoyar el análisis comercial con estimaciones globales del **importe extendido mensual**, `SUM(dw.FactVentas.ExtendedPrice)`, excluyendo `EsEliminadoFuente = 1`. Incluye los impuestos y signos registrados; no representa ventas netas ni se asume moneda. Los filtros del dashboard no modifican el modelo. El cierre debe ser un mes histórico completo elegido explícitamente; meses ausentes, nulos o series de menos de 36 meses bloquean el entrenamiento, sin imputación de ceros.
+
+Para los 41 meses confirmados: entrenamiento enero 2013–mayo 2015 (29), validación junio–noviembre 2015 (6), prueba diciembre 2015–mayo 2016 (6). Se evalúan dos bloques de tres meses por segmento con ventana creciente: cada ajuste usa solo el prefijo conocido antes del bloque, incorporando observaciones anteriores al avanzar. El escalador se ajusta dentro del pipeline de cada origen. La prueba no elige hiperparámetros ni método.
+
+Se compara [Ridge](https://scikit-learn.org/1.8/modules/generated/sklearn.linear_model.Ridge.html), con índice mensual y seno/coseno anual, frente al mismo mes del año anterior. Se selecciona α entre 0.1, 1 y 10 por MAE de validación; si Ridge no supera la referencia, se sirve esta última, identificada expresamente. Se conservan MAE y RMSE de ambos métodos para validación y prueba, calculados antes del redondeo de presentación. El ajuste final usa todo el historial. El uso del pipeline respeta la [separación de ajuste y evaluación](https://scikit-learn.org/1.8/common_pitfalls.html#data-leakage).
+
+Comandos para reproducir el entrenamiento desde la raíz. El entrenamiento real ya fue completado por el usuario; estos comandos no fueron ejecutados contra SQL Server por el agente:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --only-binary=:all: -r .\machine_learning\requirements.txt
+
+$env:ML_ENVIRONMENT = 'local'
+$env:ML_SQL_SERVER = 'HEBER-ENOC-PINE\SQLEXPRESS'
+$env:ML_SQL_DATABASE = 'WideWorldImporters_Analytics'
+$env:ML_ODBC_DRIVER = 'ODBC Driver 17 for SQL Server'
+$env:ML_TRUST_SERVER_CERTIFICATE = 'true'
+$env:ML_QUERY_TIMEOUT = '30'
+
+# Plan sin conexiones; el entrenamiento no necesita la clave HTTP de la API.
+.\.venv\Scripts\python.exe -B -m machine_learning plan --through-month 2016-05
+
+# Entrenamiento real y publicación de artefactos; SELECT únicamente.
+.\.venv\Scripts\python.exe -B -m machine_learning train --through-month 2016-05 --allow-database-access
+```
+
+La configuración `ML_*` es independiente de `API_*` y aplica la misma restricción TLS local, siempre con cifrado. `--through-month 2016-05` produce estimaciones para **junio, julio y agosto de 2016**, no para los próximos meses del calendario actual. No se garantiza que Ridge supere la referencia ni se publican intervalos de confianza. Reentrenar manualmente después de un nuevo cierre o una nueva publicación; las solicitudes HTTP nunca entrenan.
+
+El entrenador guarda `model.joblib`, `snapshot.json` y `report.json` en `artifacts/ml-sales/versions/<UUID>/`, y actualiza `current.json` de forma atómica. Se conservan corte del DW, hash de datos/código/modelo, variables, parámetro, particiones, métricas, predicciones de evaluación, fecha UTC y versiones de Python y librerías. El historial conserva importes decimales exactos; el ajuste ML usa punto flotante y las estimaciones se presentan con dos decimales. Un fallo conserva la versión activa anterior. El directorio está excluido de Git.
+
+Reiniciar FastAPI una vez para cargar las nuevas rutas y abrir «Pronóstico mensual» en el dashboard. Después de entrenar, pulsar **Actualizar pronóstico**; entrenamientos posteriores no requieren reiniciar la API. Rutas protegidas: `GET /api/v1/ml/predictions` y `/api/v1/ml/metrics`, con `publication_id` opcional para exigir el corte del panel. El backend lee únicamente JSON, sin deserializar el modelo ni necesitar scikit-learn para servirlo. Si aún no se entrenó devuelve `NOT_TRAINED`; un artefacto inválido devuelve un error seguro; si el DW tiene otro corte devuelve `STALE` y se señala que la estimación corresponde al anterior. Los indicadores de ventas siguen funcionando de forma independiente.
+
+`ML_ARTIFACT_DIR` permite cambiar el directorio, relativo a la raíz del repositorio; entrenador y API deben usar el mismo. Para reproducir: mismo snapshot/cierre, código y versiones de librerías registradas en el reporte. Pruebas críticas aisladas:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_machine_learning.py -v
+npm --prefix .\frontend test
+npm --prefix .\frontend run build
+```
+
+La prueba Ridge/joblib usa datos sintéticos y se omite si falta scikit-learn. Las demás verifican protocolo temporal, selección, errores, persistencia, acceso y estados sin SQL. Para el informe se utilizan las métricas y estimaciones de la ejecución real de ML confirmada por el usuario, no los resultados de las pruebas sintéticas.
+
+## Asistente de IA generativa
+
+**IMPLEMENTADO / PENDIENTE:** el módulo del asistente, sus consultas autorizadas y su interfaz están implementados. La integración y validación real con **Ollama** están pendientes. El código actual incluye únicamente un adaptador OpenAI; establecer `GENAI_PROVIDER=ollama` o indicar una URL local no incorpora soporte de Ollama. Aún no hay comandos de ejecución de Ollama validados para este proyecto ni aceptación real de las diez preguntas con ese proveedor.
+
+La plantilla `.env.example` deja proveedor, modelo y claves vacíos. Ventas, ML y alertas pueden ejecutarse mientras el asistente permanece pendiente. No se debe mostrar ni documentar una respuesta simulada como respuesta real de un modelo.
+
+Referencia técnica opcional del adaptador **OpenAI existente**, no de la integración pendiente con Ollama: [Responses API](https://developers.openai.com/api/docs/quickstart), con [salidas estructuradas](https://developers.openai.com/api/docs/guides/structured-outputs). Este adaptador usa HTTPS de la biblioteca estándar: **no necesita dependencias adicionales**. Si se elige probarlo expresamente, configurar en la terminal habitual de FastAPI, sin escribir claves en archivos versionados:
+
+```powershell
+$env:GENAI_PROVIDER = 'openai'
+$env:GENAI_MODEL = 'gpt-4.1-mini'
+$providerSecret = Read-Host 'Clave de OpenAI' -AsSecureString
+$env:OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', $providerSecret).Password
+Remove-Variable providerSecret
+
+.\.venv\Scripts\python.exe -B -m uvicorn backend.app:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Conservar las variables `API_*` de conexión y la clave de acceso del panel. El modelo es configurable; la cuenta debe tener acceso y cuota de API. React muestra configuración pendiente si falta proveedor/modelo/clave, y errores seguros si falla la conexión, autenticación o cuota. No simula respuestas. La clave permanece en el backend; el navegador utiliza únicamente su clave de acceso existente.
+
+El modelo interpreta la pregunta como una intención de un catálogo cerrado: seis KPIs, cobertura, agregados mensuales/anuales y rankings de clientes/productos. El servidor valida fechas, roles e identidades, ejecuta las consultas parametrizadas existentes y entrega evidencias agregadas. Una segunda generación selecciona/ordena IDs de evidencias; el servidor compone cada frase visible con su texto y cifras verificados, sin aceptar prosa factual libre ni SQL del modelo. Se muestran período, filtros efectivos, fuente, consulta autorizada y corte. Los períodos sin cobertura se reconocen como información insuficiente; los filtros aplicados pueden desactivarse en el asistente.
+
+Rutas protegidas: `GET /api/v1/assistant/status` y `POST /api/v1/assistant/ask`. Preguntas de hasta 1000 caracteres, máximo doce por minuto y dos simultáneas; tiempo y tokens del proveedor limitados. Al preguntar se envían al proveedor la pregunta, filtros y evidencias agregadas, sin credenciales ni filas de detalle. Las claves y los errores crudos del proveedor no se registran ni devuelven. No se inventan causas, inventarios actuales o cifras futuras.
+
+Diez preguntas de aceptación en `generative_ai/acceptance_cases.json`, incluidas dos sin información disponible. Listarlas no realiza conexiones. La aceptación real llama a la API local y al proveedor, puede consumir cuota, y guarda esperado/obtenido, fuentes y afirmaciones no verificadas en `artifacts/genai-acceptance/`:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m generative_ai cases
+# En una terminal con API_ACCESS_TOKEN configurado:
+.\.venv\Scripts\python.exe -B -m generative_ai acceptance --allow-http-access
+```
+
+Los comandos de aceptación requieren un proveedor compatible e integrado. La aceptación con Ollama permanece pendiente hasta completar su adaptador y ejecutar las diez preguntas; configurar sus variables por sí solo no basta. Sin proveedor configurado la aceptación queda pendiente. Un resultado PASS requiere también revisión funcional de que intención y filtros responden a la pregunta; la comprobación automática garantiza trazabilidad literal, no comprensión semántica perfecta.
+
+## Alertas y notificaciones
+
+**CONFIRMADO:** el script `005_alerts_and_notifications.sql` fue ejecutado; `DEMO_SALES_MOM` se activó, la notificación se entregó al dashboard y se marcó como leída. La consulta de duplicados devolvió cero filas. Esta evidencia acredita la demostración manual observada; no valida reintentos ante fallos reales ni ejecución automática programada.
+
+Canal implementado: **buzón interno compartido del dashboard**. Regla académica `DEMO_SALES_MOM`, versión 1: `100 × (importe extendido del mes − mes anterior) / mes anterior <= ALERT_THRESHOLD_PCT`, con referencia anterior positiva, meses consecutivos y comparación redondeada a seis decimales. El umbral predeterminado es −10%; es una regla de demostración, no una política comercial aprobada. El proceso usa el último mes histórico cerrado disponible, o `--through-month YYYY-MM` explícito; no confunde el histórico de 2016 con el mes actual.
+
+El script aditivo 005 ya está aplicado en el laboratorio confirmado. Para preparar otro destino analítico, el comando de referencia es el siguiente; crea únicamente estructuras/procedimientos `ops` y roles restringidos, manteniendo intactos DW, ETL y ML:
+
+```powershell
+sqlcmd -S 'HEBER-ENOC-PINE\SQLEXPRESS' -E -N -C -b -i '.\database\scripts\005_alerts_and_notifications.sql'
+```
+
+Asignar a las identidades Windows elegidas los roles creados: `wwi_alert_worker` concede SELECT del hecho/checkpoint y EXECUTE de cuatro procedimientos de evaluación/entrega; `wwi_notification_api` concede SELECT del buzón/eventos y EXECUTE únicamente del procedimiento de lectura. El último se añade a los permisos analíticos ya usados por la API. Ejemplo para adaptar, **sin inventar una identidad**: `ALTER ROLE wwi_alert_worker ADD MEMBER [IDENTIDAD_WINDOWS];`. No usar permisos generales de escritura para el servicio. Los cambios de estado quedan encapsulados en procedimientos; las consultas analíticas siguen en el adaptador de solo lectura.
+
+Para reproducir la demostración manual ya confirmada, configurar el proceso independiente en otra terminal. El comando de no activación sigue siendo un caso de comprobación pendiente de evidencia real:
+
+```powershell
+$env:ALERT_ENVIRONMENT = 'local'
+$env:ALERT_SQL_SERVER = 'HEBER-ENOC-PINE\SQLEXPRESS'
+$env:ALERT_SQL_DATABASE = 'WideWorldImporters_Analytics'
+$env:ALERT_ODBC_DRIVER = 'ODBC Driver 17 for SQL Server'
+$env:ALERT_TRUST_SERVER_CERTIFICATE = 'true'
+$env:ALERT_THRESHOLD_PCT = '-10'
+$env:ALERT_MAX_ATTEMPTS = '3'
+
+.\.venv\Scripts\python.exe -B -m notifications plan
+# Demostración con datos reales: ajusta el umbral a variación observada + 1 punto.
+# Se conserva expresamente el modo FORCED_DEMO_ON en la evaluación y el evento.
+.\.venv\Scripts\python.exe -B -m notifications run --through-month 2016-05 --demo-trigger --allow-database-access
+# Caso de no activación: umbral = variación observada − 1 punto.
+.\.venv\Scripts\python.exe -B -m notifications evaluate --through-month 2016-05 --demo-no-trigger --allow-database-access
+```
+
+Reiniciar FastAPI para cargar las nuevas rutas y abrir **Notificaciones**. Actualización automática del buzón cada 30 segundos o mediante su botón; «Marcar como leída» registra recepción/lectura. Repetir el comando de activación conserva una sola notificación para la misma regla, período, valores, umbral y modo, incluso si hay una publicación posterior con valores iguales. Cada evaluación sí se audita. El script opcional `006_verify_alerts.sql` permite comprobar evaluaciones, estados, intentos, entrega, lectura y ausencia de duplicados.
+
+**IMPLEMENTADO, PENDIENTE DE VALIDACIÓN REAL:** se conserva un outbox con reserva temporal de tres minutos, unicidad por evento, entrega y estado en una transacción, reintentos con espera mínima de 10, 20, … segundos y límite configurable. Un fallo conserva el evento para recuperación. Los siguientes comandos preparan una demostración de reintento con falla simulada, **antes de entregar un evento pendiente**; no acreditan recuperación ante fallos reales:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m notifications evaluate --through-month 2016-05 --demo-trigger --allow-database-access
+.\.venv\Scripts\python.exe -B -m notifications deliver --simulate-delivery-failure --limit 1 --allow-database-access
+.\.venv\Scripts\python.exe -B -m notifications deliver --retry-now --allow-database-access
+```
+
+La falla simulada se identifica como `ACADEMIC_SIMULATED_FAILURE`; no implica una falla real del servidor. Si ese evento ya está entregado, no se vuelve a enviar: usar un período distinto con datos para demostrar un intento nuevo.
+
+**PENDIENTE DE VALIDACIÓN:** automatización independiente de HTTP y de SQL Server Agent. El proceso y el script están disponibles, pero no se ha confirmado su funcionamiento programado:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m notifications watch --interval-seconds 300 --allow-database-access
+```
+
+Alternativamente, crear `.env.alerts` local (ignorado por Git) con las variables `ALERT_*` anteriores y programar `scripts/run-alerts.ps1 -ConfigFile RUTA_ABSOLUTA\.env.alerts` cada cinco minutos en el Programador de tareas de Windows, bajo la identidad con permisos. El script carga únicamente esas variables como valores literales del proceso. Ejemplo manual de registro desde la raíz:
+
+```powershell
+$projectPath = (Get-Location).Path
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -File "{0}\scripts\run-alerts.ps1" -ConfigFile "{0}\.env.alerts"' -f $projectPath) -WorkingDirectory $projectPath
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName 'WWI-Alertas-Academicas' -Action $action -Trigger $trigger
+```
+
+Estos comandos de programación no fueron ejecutados por el agente y no constituyen evidencia de automatización validada. Las rutas protegidas del buzón son `GET /api/v1/notifications` y `POST /api/v1/notifications/{UUID}/read`. En destinos nuevos, sin script/permisos se muestra preparación pendiente; los errores del buzón no bloquean ventas ni pronósticos. Permanecen pendientes la comprobación real de no activación, los reintentos ante fallos reales, la programación automática y la revisión de permisos mínimos. En IA falta integrar Ollama y validar las diez preguntas. No se mantienen como pendientes el DDL 005, la activación, entrega, lectura o la consulta de duplicados ya confirmados. Pruebas críticas locales desde la raíz: `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_intelligent_modules.py -v`, `npm --prefix .\frontend test` y `npm --prefix .\frontend run build`.
+
+## Ejecución
+
+Requisitos comprobados del ETL: Python 3.13.17, entorno `.venv`, pyodbc 5.5.0, Driver ODBC 17 y `sqlcmd` en Windows. Su dependencia Python está en [requirements.txt](requirements.txt). Para otro entorno: `.\.venv\Scripts\python.exe -m pip install --only-binary=:all: -r requirements.txt`.
+
+Pruebas y plan sin conexiones:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -B -m etl plan --full
+```
+
+Los siguientes comandos son **para ejecución manual del usuario**, desde la raíz. No fueron ejecutados por el agente. Los scripts 001/002 ya se aplicaron en el laboratorio confirmado; en un destino nuevo ejecutar primero esos dos en orden.
+
+```powershell
+sqlcmd -S 'HEBER-ENOC-PINE\SQLEXPRESS' -E -N -C -b -i '.\database\scripts\003_complete_sales_pipeline.sql'
+
+$env:ETL_ENVIRONMENT = 'local'
+$env:ETL_SOURCE_SERVER = 'HEBER-ENOC-PINE\SQLEXPRESS'
+$env:ETL_TARGET_SERVER = 'HEBER-ENOC-PINE\SQLEXPRESS'
+$env:ETL_SOURCE_DATABASE = 'WideWorldImporters'
+$env:ETL_TARGET_DATABASE = 'WideWorldImporters_Analytics'
+$env:ETL_ENCRYPT = 'yes'
+$env:ETL_TRUST_SERVER_CERTIFICATE = 'true'
+$env:ETL_BATCH_SIZE = '500'
+$env:ETL_QUERY_TIMEOUT = '300'
+
+.\.venv\Scripts\python.exe -B -m etl run --allow-database-access --consistency stable-window --confirm-stable-source
+
+sqlcmd -S 'HEBER-ENOC-PINE\SQLEXPRESS' -E -N -C -b -i '.\database\scripts\004_verify_sales_pipeline.sql'
+```
+
+`stable-window` exige que las cuatro tablas permanezcan sin escrituras durante toda la captura. La confirmación es externa; el programa no congela la fuente. Alternativa: `--consistency snapshot`, únicamente si ALLOW_SNAPSHOT_ISOLATION ya está habilitado y verificado en el origen. El programa no cambia esa configuración.
+
+La excepción de certificado es explícita y solo admite `ETL_ENVIRONMENT=local` con ambas conexiones a la instancia indicada. `Encrypt=yes` es obligatorio; confianza del certificado predeterminada `false`. En producción se mantiene validación. Los parámetros `sqlcmd -N -C` son la excepción explícita del mismo laboratorio local.
+
+[.env.example](.env.example) enumera las variables; no se carga automáticamente. Autenticación integrada de Windows, sin contraseñas en código. La identidad debe poder leer las cuatro proyecciones del origen y leer/escribir staging, DW y auditoría del destino, además de ejecutar los procedimientos de application locks. Los permisos DDL se necesitan únicamente al aplicar los scripts.
+
+## Recuperación y muestras
+
+Para reutilizar un Raw completo tras un fallo en Clean/Ready/publicación, reemplazar el UUID por el informado:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m etl run --allow-database-access --execution-id UUID_DE_LA_EJECUCION
+```
+
+Ese comando solo abre el destino: verifica origen lógico, versiones, cuatro manifiestos, conteos y hashes. Si ya está publicado devuelve un no-op. Cada intento de transformación tiene un UUID propio; Raw conserva el intento de captura original. Un Raw incompleto exige una nueva captura completa. Si se perdió la confirmación de commit, comprobar/reutilizar el mismo execution_id antes de recapturar.
+
+Una secuencia técnica de captura impide publicar Raw anterior a un corte ya publicado. En ese caso se conserva la evidencia y se exige una captura nueva; no se hace retroceder el DW.
+
+Las muestras anteriores permanecen intactas. `extract --max-rows-per-table 100` conserva el comando de muestra de facturas/líneas, siempre RAW_PARTIAL. `run` no admite límites ni convierte esas muestras en publicaciones. Reintentar solo reconstruye Clean/Ready del execution_id elegido; no borra Raw ni la evidencia de intentos. No hay purga automática: medir espacio y retención en Express antes de acumular generaciones.
+
+## Comportamiento implementado
+
+- Una captura completa de Customers, StockItems, Invoices e InvoiceLines por corte coherente. Proyecciones del diccionario, lectura por lotes, autenticación/TLS comunes a ambas conexiones. Fechas datetime2(7) conservadas como ISO exacto y sin atribuir zona horaria comercial.
+- Raw inmutable por ejecución; claves, UUID, hashes y manifiestos. Conteo independiente del origen dentro del mismo corte, comparado con filas leídas y persistidas. Validación técnica antes de insertar; incompatibilidades conservadas en cuarentena y captura fallida.
+- Clean revalida tipos, nulabilidad, duplicados, hashes y las cinco relaciones. Guarda originales, regla, severidad, entidad, clave e intento en `audit.etl_quarantine`. ERROR bloquea toda la publicación; WARNING conserva la fila. No hay ganador arbitrario para claves conflictivas.
+- Cantidad no positiva queda en revisión bloqueante según DQ-15 hasta aprobar su clasificación comercial. Catálogos no resueltos bloquean: la política de usar miembros desconocidos aún no está aprobada. Los miembros técnicos 0 existen con clave natural NULL.
+- Precio NULL y Brand NULL se conservan; base NULL implica medida incompleta. Precios cero/negativos, notas de crédito, espacios externos y diferencias base+impuestos/extendido se registran como advertencias. No se imputan ceros, recortan nombres, invierten signos ni reconstruyen ExtendedPrice.
+- Ready integra una fila por InvoiceLineID, roles de comprador/facturado tomados de Invoices y base Quantity × UnitPrice en decimal(29,2). El precio actual del producto no sustituye al precio de venta.
+- DW: DimFecha con años completos e ISO semanal; DimCliente única con dos roles; DimProducto; FactVentas por InvoiceLineID. SCD Tipo 1, claves sustitutas persistentes, bajas lógicas y reactivación sin duplicar el hecho. Los períodos temporales del catálogo no se interpretan como vigencia comercial.
+- Lectura completa y carga diferencial del destino: insertados, modificados, sin cambios, eliminados y reactivados. Detecta cambios sin timestamp y de cabecera, y registros tardíos. Reactivados es subconjunto de modificados; activos actuales = activos anteriores + insertados + reactivados − eliminados.
+- Publicación de dimensiones, hechos, checkpoint y auditoría en una transacción. Exclusión de ejecuciones mediante [application lock de sesión](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-ver16). El checkpoint guarda generación, origen, versiones y vector de manifiestos; LastEditedWhen es observación y no filtro exclusivo.
+- Reconciliación exacta de conteos, unidades, base conocida/faltante, impuestos, extendido, utilidad y facturas distintas entre las cuatro zonas. Comparación de valores por línea en ambos sentidos y control de claves dimensionales. Los totales solos no autorizan la publicación.
+- `dw.vw_VentasActivas` excluye bajas y `dw.vw_KPIVentas` calcula los seis indicadores, con divisiones entre cero y base incompleta tratadas explícitamente. El checkpoint identifica el corte actual; publication_id en cada fila indica su última modificación, no un filtro para excluir filas sin cambios.
+
+Solo se observa el estado de cada corte; inserciones y bajas ocurridas entre dos capturas pueden ser invisibles. Tipo 1 no reconstruye los atributos «como se conocían al vender». Moneda, unidad comercial y reglas de créditos siguen pendientes de aceptación funcional; no se asumen USD/HNL ni conversiones. Los meses fuera de cobertura no se rellenan con ceros.
+
+## Archivos principales
+
+```text
+etl/
+  config.py, contracts.py, extract.py, staging.py, pipeline.py, cli.py
+  quality.py, warehouse.py, warehouse_store.py, workflow.py
+backend/
+  app.py, config.py, domain.py, queries.py, repository.py, service.py, forecast.py
+  requirements.txt
+frontend/
+  package.json, vite.config.ts, index.html
+  src/                   # React/TypeScript, ECharts y estilos responsive
+  tests/model.test.cjs
+machine_learning/
+  __main__.py, series.py, training.py, artifacts.py, requirements.txt
+database/scripts/
+  001_create_analytics_database.sql
+  002_create_raw_and_audit.sql
+  003_complete_sales_pipeline.sql
+  004_verify_sales_pipeline.sql
+tests/
+  test_etl.py
+  test_warehouse.py
+  test_api.py
+  test_machine_learning.py
+```
+
+stdout contiene progreso/resumen JSON; stderr, errores seguros sin el mensaje crudo del driver. Se conservan SQLSTATE, proveedor y código nativo reconocidos. Salidas: 0 éxito, 1 fallo, 2 bloqueo/configuración y 130 interrupción. Una terminación abrupta puede dejar estado en curso; comprobar el execution_id antes de reintentar.
+
+## Referencias del proyecto
 
 | Contenido | Archivo |
 |---|---|
-| Fuente, diccionario, ERD y resultados iniciales | [database/README.md](database/README.md) |
-| Arquitectura, responsabilidades y decisiones pendientes | [architecture.md](docs/architecture/architecture.md) |
-| Modelo estrella, grano, claves y SCD | [dimensional-model.md](docs/architecture/dimensional-model.md) |
-| Raw/Clean/Ready, calidad, auditoría y retención | [staging-design.md](docs/architecture/staging-design.md) |
-| Carga inicial/incremental, recuperación y 22 casos de prueba | [incremental-loads.md](docs/architecture/incremental-loads.md) |
-| Seis KPIs, consultas propuestas y 14 casos de prueba | [metrics-contract.md](docs/quality/metrics-contract.md) |
-| Requisitos, criterios de aceptación y evidencias de la guía | [traceability.md](docs/requirements/traceability.md) |
+| Fuente, diccionario, ERD y evidencias iniciales | [database/README.md](database/README.md) |
+| Arquitectura y responsabilidades | [architecture.md](docs/architecture/architecture.md) |
+| Modelo dimensional y SCD | [dimensional-model.md](docs/architecture/dimensional-model.md) |
+| Staging y catálogo de reglas | [staging-design.md](docs/architecture/staging-design.md) |
+| Contrato incremental y casos | [incremental-loads.md](docs/architecture/incremental-loads.md) |
+| Seis indicadores y consultas de contraste | [metrics-contract.md](docs/quality/metrics-contract.md) |
+| Requisitos y criterios académicos | [traceability.md](docs/requirements/traceability.md) |
 
-Las carpetas y los nombres de documentos son una elección del proyecto. La guía exige contenidos, pruebas y resultados; su estructura de carpetas y sus tecnologías de referencia son recomendaciones. Las tecnologías indicadas arriba fueron seleccionadas para este proyecto.
-
-## Estructura actual
-
-```text
-.
-├── .gitignore
-├── README.md
-├── Figura_2_Arquitectura_Plataforma.png
-├── Figura_2_Arquitectura_Plataforma.svg
-├── database/
-│   ├── README.md
-│   ├── Diccionario_Datos_WideWorldImporters.csv
-│   ├── Perfilado_Inicial_WideWorldImporters.csv
-│   ├── ERD_WideWorldImporters.dbml
-│   ├── ERD_WideWorldImporters_Origen_OLTP.png
-│   ├── ERD_WideWorldImporters_Origen_OLTP.svg
-│   └── normalized/
-│       ├── Diccionario_Datos_WideWorldImporters.csv
-│       └── Perfilado_Inicial_WideWorldImporters.csv
-└── docs/
-    ├── architecture/
-    │   ├── architecture.md
-    │   ├── dimensional-model.md
-    │   ├── staging-design.md
-    │   └── incremental-loads.md
-    ├── quality/
-    │   └── metrics-contract.md
-    └── requirements/
-        └── traceability.md
-```
-
-El código se organizará por responsabilidades ETL, backend, frontend, ML, GenAI, notificaciones, scripts y pruebas cuando existan archivos ejecutables. Las responsabilidades ya están definidas en arquitectura; no se mantienen directorios con README de reserva.
-
-## Entorno y reproducción
-
-Última comprobación documentada: 2026-11-14.
-
-| Elemento | Resultado / pendiente |
-|---|---|
-| SQL Server | 2022 Express; WideWorldImporters en `HEBER-ENOC-PINE\SQLEXPRESS`, confirmado por el proyecto |
-| Git | 2.49.0.windows.1 |
-| Node.js / npm | 20.19.4 / 10.8.2; seleccionar una LTS mantenida antes del desarrollo |
-| Python | Intérprete utilizable pendiente; accesos WindowsApps y shim python3.12 no acreditaron ejecución |
-| ODBC | Driver 17 registrado y DLL presente; conexión no probada por el agente |
-| Dependencias | Versiones, entornos y manifiestos pendientes; sin instalaciones realizadas |
-
-El shim Python 3.12 apuntaba a `C:\python312\python.exe` inexistente; `py` no estaba en PATH. Se propone evaluar Python 3.12/3.13 y Node 24 LTS al preparar el entorno. [Calendario de soporte de Node.js](https://nodejs.org/en/about/previous-releases).
-
-Dependencias previstas: pyodbc/SQLAlchemy, pandas/NumPy, FastAPI/Pydantic/Uvicorn y las bibliotecas del stack aprobado. Su disponibilidad y versiones no están verificadas para el proyecto.
-
-Desde la raíz se pueden revisar los archivos y comprobar herramientas sin conectar a bases:
-
-```powershell
-git status --short --branch
-git diff --check
-node --version
-npm --version
-Get-Command python, python3, python3.12, py -ErrorAction SilentlyContinue
-```
-
-Los comandos de instalación, ejecución y recuperación se documentarán junto con el código. La guía exige README reproducible, manuales y una plantilla `.env.example` sin secretos para la entrega; esos artefactos ejecutables aún están pendientes.
-
-## Fuentes académicas y seguridad
-
-La guía versión 1.0, noviembre de 2026, y el informe Word están en la carpeta superior: `../Guia_Proyecto_Ingenieria_Datos_Analitica_Inteligente.pdf` y `../Informe_Examen_Practico_Parcial-1.docx`. El informe incluye descubrimiento, requisitos, KPIs y arquitectura. Su portada indica 26 de octubre de 2026, fecha pendiente de revisión académica. Ambos originales permanecen fuera de estos commits.
-
-La base original y sus archivos temporales serán de solo lectura. Las pruebas de cambios usarán un entorno independiente autorizado. Credenciales y configuración local quedan excluidas de Git; ETL, entrenamiento y automatización se ejecutarán fuera de las solicitudes HTTP.
+Los documentos de diseño conservan su versión previa. La guía de noviembre de 2026 y el informe Word están en la carpeta superior y permanecen intactos. La publicación del ETL, el funcionamiento de API/dashboard, el entrenamiento real de ML y la demostración manual de alertas corresponden a la evidencia confirmada por el usuario. Las pruebas aisladas no sustituyen esa evidencia ni acreditan por sí solas precisión predictiva, reintentos reales, programación automática o integración con Ollama. Incorporar al informe las métricas y capturas de las ejecuciones realizadas, manteniendo explícitos los pendientes.
