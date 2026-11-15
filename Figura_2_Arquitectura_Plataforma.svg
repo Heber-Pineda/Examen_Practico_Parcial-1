@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1680" viewBox="0 0 1400 1680">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#356C86"/></marker><marker id="arr2" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#BA8354"/></marker></defs>
+<rect width="1400" height="1680" fill="#ffffff"/>
+<text x="700" y="75" text-anchor="middle" fill="#17354B" font-family="DejaVu Sans,Arial" font-size="36" font-weight="700">ARQUITECTURA GENERAL DE LA PLATAFORMA</text>
+<text x="700" y="116" text-anchor="middle" fill="#64768A" font-family="DejaVu Sans,Arial" font-size="23">Ingeniería de Datos y Analítica Inteligente  ·  Diseño lógico propuesto</text>
+
+<rect x="200" y="165" width="1000" height="112" rx="19" fill="#EDF6FE" stroke="#B4CDDF" stroke-width="2"/>
+<text x="700" y="208" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="29" font-weight="700" fill="#163E5B">FUENTE OPERACIONAL · SQL SERVER</text>
+<text x="700" y="246" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="23" font-weight="400" fill="#37566E">WideWorldImporters (OLTP) · Consulta de solo lectura</text>
+<polyline points="700,278 700,313" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="200" y="327" width="1000" height="112" rx="19" fill="#F0F6FB" stroke="#AFC6D6" stroke-width="2"/>
+<text x="700" y="371" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="29" font-weight="700" fill="#163E5B">EXTRACCIÓN Y ORQUESTACIÓN · PYTHON</text>
+<text x="700" y="406" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="23" font-weight="400" fill="#37566E">Carga inicial e incremental · Validaciones · Auditoría</text>
+<polyline points="700,439 700,494" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="135" y="506" width="1130" height="265" rx="23" fill="#FAFCFE" stroke="#C4D7E3" stroke-width="3"/>
+<text x="700" y="550" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="28" font-weight="700" fill="#173F59">STAGING · SQL SERVER</text>
+<rect x="175" y="587" width="310" height="142" rx="19" fill="#EAF3FD" stroke="#B9D0E1" stroke-width="2"/>
+<text x="330" y="635" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="31" font-weight="700" fill="#204860">RAW</text>
+<text x="330" y="674" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="24" font-weight="400" fill="#37566E">Datos de origen</text>
+<text x="330" y="706" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="23" font-weight="400" fill="#37566E">Identificador de lote</text>
+<rect x="545" y="587" width="310" height="142" rx="19" fill="#EAF3FD" stroke="#B9D0E1" stroke-width="2"/>
+<text x="700" y="635" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="31" font-weight="700" fill="#204860">CLEAN</text>
+<text x="700" y="674" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="24" font-weight="400" fill="#37566E">Limpieza y calidad</text>
+<text x="700" y="706" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="23" font-weight="400" fill="#37566E">Rechazos controlados</text>
+<rect x="915" y="587" width="310" height="142" rx="19" fill="#EAF3FD" stroke="#B9D0E1" stroke-width="2"/>
+<text x="1070" y="635" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="31" font-weight="700" fill="#204860">READY</text>
+<text x="1070" y="674" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="24" font-weight="400" fill="#37566E">Datos integrados</text>
+<text x="1070" y="706" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="23" font-weight="400" fill="#37566E">Claves de negocio</text>
+<polyline points="486,658 535,658" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<polyline points="856,658 905,658" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<polyline points="1070,771 1070,812 700,812 700,839" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="200" y="850" width="1000" height="128" rx="21" fill="#E8F6F1" stroke="#9FC5B8" stroke-width="3"/>
+<text x="700" y="895" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="30" font-weight="700" fill="#1B594E">DATA WAREHOUSE · SQL SERVER</text>
+<text x="700" y="933" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="24" font-weight="400" fill="#37566E">FactVentas  ·  DimFecha  ·  DimCliente  ·  DimProducto</text>
+<text x="700" y="961" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="21" font-weight="400" fill="#487268">Modelo estrella · Datos reconciliados</text>
+<rect x="45" y="1030" width="1310" height="425" rx="23" fill="#FCFDFE" stroke="#D5DEE7" stroke-width="2"/>
+<text x="700" y="1074" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="28" font-weight="700" fill="#234B64">CONSUMO Y ANALÍTICA</text>
+<polyline points="700,978 700,1008" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  />
+<polyline points="210,1008 1190,1008" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  />
+<polyline points="210,1008 210,1121" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<polyline points="535,1008 535,1121" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<polyline points="1190,1008 1190,1121" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="65" y="1126" width="295" height="133" rx="18" fill="#F4F1FC" stroke="#C7C2E6" stroke-width="2"/>
+<text x="212.5" y="1168" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#213F56">MACHINE LEARNING</text>
+<text x="212.5" y="1207" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Python · Scikit-learn</text>
+<text x="212.5" y="1237" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Entrenamiento por lotes</text>
+<rect x="390" y="1126" width="295" height="133" rx="18" fill="#EFF6FC" stroke="#B8CDDE" stroke-width="2"/>
+<text x="537.5" y="1168" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#213F56">API · FASTAPI</text>
+<text x="537.5" y="1207" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Autorización · KPIs</text>
+<text x="537.5" y="1237" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Consultas parametrizadas</text>
+<rect x="715" y="1126" width="295" height="133" rx="18" fill="#FFF6EB" stroke="#E7CEAD" stroke-width="2"/>
+<text x="862.5" y="1168" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#213F56">IA GENERATIVA</text>
+<text x="862.5" y="1207" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Explicaciones basadas</text>
+<text x="862.5" y="1237" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">en datos autorizados</text>
+<rect x="1040" y="1126" width="295" height="133" rx="18" fill="#FFF6EB" stroke="#E7CEAD" stroke-width="2"/>
+<text x="1187.5" y="1168" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#213F56">REGLAS DE ALERTA</text>
+<text x="1187.5" y="1207" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Umbrales · Evaluaciones</text>
+<text x="1187.5" y="1237" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Registro y seguimiento</text>
+<polyline points="685,1171 705,1171" fill="none" stroke="#BA8354" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr2)"/>
+<polyline points="212.5,1259 212.5,1305" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="65" y="1313" width="295" height="98" rx="16" fill="#F7FAFC" stroke="#CDD9E2" stroke-width="2"/>
+<text x="212.5" y="1350" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#244963">PREDICCIONES</text>
+<text x="212.5" y="1387" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Versión · Horizonte</text>
+<polyline points="537.5,1259 537.5,1305" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="390" y="1313" width="295" height="98" rx="16" fill="#F7FAFC" stroke="#CDD9E2" stroke-width="2"/>
+<text x="537.5" y="1350" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#244963">DASHBOARD WEB</text>
+<text x="537.5" y="1387" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">React · Visualización</text>
+<polyline points="862.5,1259 862.5,1305" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="715" y="1313" width="295" height="98" rx="16" fill="#F7FAFC" stroke="#CDD9E2" stroke-width="2"/>
+<text x="862.5" y="1350" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#244963">RESPUESTAS IA</text>
+<text x="862.5" y="1387" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Métricas y contexto</text>
+<polyline points="1187.5,1259 1187.5,1305" fill="none" stroke="#356C86" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"  marker-end="url(#arr)"/>
+<rect x="1040" y="1313" width="295" height="98" rx="16" fill="#F7FAFC" stroke="#CDD9E2" stroke-width="2"/>
+<text x="1187.5" y="1350" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="700" fill="#244963">NOTIFICACIONES</text>
+<text x="1187.5" y="1387" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="20" font-weight="400" fill="#37566E">Evento · Estado · Entrega</text>
+<text x="700" y="1498" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="22" font-weight="400" fill="#51687A">La API presenta datos del DW, predicciones y alertas; la IA no ejecuta SQL arbitrario.</text>
+<rect x="120" y="1530" width="1160" height="111" rx="18" fill="#F4F6F8" stroke="#D2DBE1" stroke-width="2"/>
+<text x="700" y="1573" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="26" font-weight="700" fill="#24445A">SEGURIDAD, CALIDAD Y MONITOREO TRANSVERSAL</text>
+<text x="700" y="1610" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="21" font-weight="400" fill="#37566E">Permisos · Linaje · Logs ETL · Reintentos · Estado de cargas · Modelos y alertas</text>
+</svg>
