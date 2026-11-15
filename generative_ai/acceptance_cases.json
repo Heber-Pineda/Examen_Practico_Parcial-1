@@ -1,0 +1,12 @@
+[
+  {"id":"IA-01","question":"¿Cuál es el importe base facturado de todo el histórico?","expected_status":"ANSWERED","expected_query":"sales_metrics_v1"},
+  {"id":"IA-02","question":"¿Cuál fue el importe extendido de mayo de 2016?","expected_status":"ANSWERED","expected_query":"sales_metrics_v1"},
+  {"id":"IA-03","question":"¿Cuántas unidades se vendieron durante 2015?","expected_status":"ANSWERED","expected_query":"sales_metrics_v1"},
+  {"id":"IA-04","question":"¿Cuántas facturas distintas hubo en enero de 2014?","expected_status":"ANSWERED","expected_query":"sales_metrics_v1"},
+  {"id":"IA-05","question":"¿Cuál fue la utilidad registrada y el margen de utilidad durante 2015?","expected_status":"ANSWERED","expected_query":"sales_metrics_v1"},
+  {"id":"IA-06","question":"¿Qué cinco productos tuvieron mayor importe extendido en 2015?","expected_status":"ANSWERED","expected_query":"top_product_buyer_v1"},
+  {"id":"IA-07","question":"¿Qué cinco clientes compradores tuvieron mayor importe extendido en mayo de 2016?","expected_status":"ANSWERED","expected_query":"top_customer_buyer_v1"},
+  {"id":"IA-08","question":"¿Cómo se distribuyó el importe extendido por mes durante 2015?","expected_status":"ANSWERED","expected_query":"sales_month_v1"},
+  {"id":"IA-09","question":"¿Cuál es el inventario físico disponible actualmente de cada producto?","expected_status":"INSUFFICIENT_DATA","expected_query":null},
+  {"id":"IA-10","question":"¿Cuál fue el importe extendido realmente vendido durante enero de 2026?","expected_status":"INSUFFICIENT_DATA","expected_query":null}
+]
